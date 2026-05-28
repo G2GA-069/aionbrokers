@@ -212,7 +212,12 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .score-bd-bar.b-sec > span{background:var(--purple-brand)}
 .score-bd-bar.b-tier > span{background:#6D28D9}
 .score-bd-bar.b-geo > span{background:#B45309}
+.score-bd-bar.inactive{background:repeating-linear-gradient(45deg,rgba(58,16,120,0.06) 0 3px,transparent 3px 6px);border:1px dashed rgba(58,16,120,0.18)}
 .score-bd-lbl{font-size:9.5px;color:var(--ink-mid);font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+
+/* "Sharpen your search" hint when too few axes are active */
+.mm-sharpen{font-size:12.5px;color:var(--purple-deep);background:linear-gradient(135deg,var(--purple-wash),#FEF6DA);border:1px solid var(--gold-light);border-left:4px solid var(--gold);border-radius:8px;padding:11px 16px;margin-bottom:12px;font-weight:500;line-height:1.5}
+.mm-sharpen strong{color:var(--purple-brand);font-weight:600}
 
 /* Detail-panel breakdown block */
 .bd-detail{display:flex;flex-direction:column;gap:10px;padding:16px;background:var(--purple-wash);border-radius:10px;border:1px solid var(--border);margin-bottom:14px}
@@ -221,6 +226,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .bd-row-bar{flex:1;height:7px;background:rgba(58,16,120,0.10);border-radius:4px;overflow:hidden}
 .bd-row-bar > span{display:block;height:100%;border-radius:4px}
 .bd-row-pts{flex:0 0 56px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink);font-weight:600}
+.bd-row-inactive .bd-row-label,.bd-row-inactive .bd-row-pts{color:var(--grey)}
+.bd-row-bar-inactive{background:repeating-linear-gradient(45deg,rgba(58,16,120,0.06) 0 4px,transparent 4px 8px) !important;border:1px dashed rgba(58,16,120,0.18)}
 .bd-rationale{font-size:12px;color:var(--ink-mid);line-height:1.55;padding:11px 14px;background:var(--white);border-radius:8px;border-left:3px solid var(--gold);margin-top:6px;font-weight:500}
 
 /* Confidence popover */
@@ -441,6 +448,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .fee-calc-input{width:120px;padding:9px 13px;border:1px solid var(--border-strong);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;outline:none;text-align:right;color:var(--ink);transition:all .15s}
 .fee-calc-input:focus{border-color:var(--purple-brand);box-shadow:0 0 0 3px rgba(91,44,158,0.12)}
 .fee-calc-result{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--purple-deep)}
+.fee-calc-drivers{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-strong);font-size:10.5px;color:var(--ink-light);line-height:1.5}
+.fc-drivers-base{font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--ink-mid);margin-bottom:4px}
+.fc-drivers-list{margin:0;padding-left:14px;list-style:disc}
+.fc-drivers-list li{margin:1px 0;color:var(--ink-mid);font-weight:500}
 
 /* Toast */
 .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--purple-deep);color:var(--white);padding:11px 24px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;pointer-events:none;z-index:999;box-shadow:0 8px 24px rgba(26,10,62,0.35);border:1px solid rgba(255,255,255,0.10)}
@@ -749,7 +760,7 @@ const BD = [{"id":"NEW-goldman-sachs","name":"Goldman Sachs (London)","type":"bu
 // PASSWORD GATE
 // ══════════════════════════════════════════════════════════════
 const PW_HASH='7b09da04abd9e93efdf31aa55f9a0e6ca4ae2f3006e0946a48e31961a1a5d752';
-const SESSION_KEY='aion_auth';
+const SESSION_KEY='g2g_auth';
 
 async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
@@ -781,39 +792,105 @@ if(sessionStorage.getItem(SESSION_KEY)==='1'){
 // CRM & PERSISTENCE
 // ══════════════════════════════════════════════════════════════
 let crm={},nts={};
-try{crm=JSON.parse(localStorage.getItem('aion_crm')||'{}')}catch(e){}
-try{nts=JSON.parse(localStorage.getItem('aion_nts')||'{}')}catch(e){}
-function saveCRM(){localStorage.setItem('aion_crm',JSON.stringify(crm));updateStats()}
-function saveNts(){localStorage.setItem('aion_nts',JSON.stringify(nts))}
+try{crm=JSON.parse(localStorage.getItem('g2g_crm')||'{}')}catch(e){}
+try{nts=JSON.parse(localStorage.getItem('g2g_nts')||'{}')}catch(e){}
+function saveCRM(){localStorage.setItem('g2g_crm',JSON.stringify(crm));updateStats()}
+function saveNts(){localStorage.setItem('g2g_nts',JSON.stringify(nts))}
 
 // ══════════════════════════════════════════════════════════════
-// FEE ESTIMATION (Lehman-style sliding scale)
+// FEE ESTIMATION
 // ══════════════════════════════════════════════════════════════
-function estimateFee(ev_m, firmType){
-  // ev_m in millions
+// Lehman-style sliding scale + type multiplier + per-type floors
+// + sector premium + cross-border premium + deal-type adjustment.
+// Returns {low, high, mid, drivers[]} where drivers explains the
+// multipliers applied (surfaced in the detail-panel calculator).
+const FEE_TYPE_MULT = {
+  bulge_bracket: 1.7,                    // M&A line item; closer to market than the old 1.8
+  elite_boutique: 1.5,
+  upper_mid_market: 1.2,
+  tech_specialist_boutique: 1.3,         // specialism commands a premium
+  corporate_finance_boutique: 0.9,
+  accountancy_cf_arm: 0.75,
+  business_broker: 0.5,
+  national_broker_network: 0.55
+};
+// Per-type minimum-engagement fee floors (the smallest cheque most
+// firms of that calibre will write a mandate for, retainer + completion).
+const FEE_TYPE_FLOOR = {
+  bulge_bracket:            [1500000, 5000000],
+  elite_boutique:           [ 750000, 2000000],
+  upper_mid_market:         [ 400000, 1200000],
+  tech_specialist_boutique: [ 300000,  900000],
+  corporate_finance_boutique:[ 75000,  200000],
+  accountancy_cf_arm:       [  50000,  150000],
+  business_broker:          [  15000,   45000],
+  national_broker_network:  [  20000,   60000]
+};
+const FEE_SECTOR_PREMIUM = {
+  technology:        { mult: 1.15, label: 'Tech / SaaS specialism +15%' },
+  oil_gas:           { mult: 1.10, label: 'Energy specialism +10%' },
+  healthcare:        { mult: 1.10, label: 'Healthcare specialism +10%' },
+  financial:         { mult: 1.05, label: 'FinServ specialism +5%' },
+  business_services: { mult: 1.05, label: 'B-services specialism +5%' }
+};
+const FEE_DEALTYPE_ADJ = {
+  mbo:       { mult: 1.05, label: 'MBO complexity +5%' },
+  buy:       { mult: 1.05, label: 'Buy-side mandate +5%' },
+  fundraise: { mult: 0.90, label: 'Fundraise advisory −10%' }
+};
+
+function estimateFee(ev_m, firmType, opts){
+  opts = opts || {};
   const ev = ev_m * 1000000;
   let fee = 0;
-  // Lehman brackets
+
+  // Lehman brackets — 5/4/3/2/1 across £10m / £15m / £25m / £50m / £100m
   if(ev <= 10000000) fee = ev * 0.05;
   else if(ev <= 25000000) fee = 500000 + (ev - 10000000) * 0.04;
   else if(ev <= 50000000) fee = 1100000 + (ev - 25000000) * 0.03;
   else if(ev <= 100000000) fee = 1850000 + (ev - 50000000) * 0.02;
   else fee = 2850000 + (ev - 100000000) * 0.01;
 
-  // Type multiplier
-  const mult = {
-    bulge_bracket: 1.8,
-    elite_boutique: 1.6,
-    upper_mid_market: 1.2,
-    tech_specialist_boutique: 1.3,
-    corporate_finance_boutique: 0.9,
-    accountancy_cf_arm: 0.7,
-    business_broker: 0.5,
-    national_broker_network: 0.6
-  }[firmType] || 1.0;
+  const drivers = [];
 
-  const base = fee * mult;
-  return { low: base * 0.7, high: base * 1.3 };
+  // Firm type multiplier
+  const typeMult = FEE_TYPE_MULT[firmType] || 1.0;
+  fee *= typeMult;
+  drivers.push({ k: 'type', label: `Firm type ×${typeMult.toFixed(2)}` });
+
+  // Sector premium (use the strongest matching sector if multiple)
+  const sectors = opts.sectors || [];
+  let bestSecMult = 1.0, bestSecLabel = null;
+  for(const s of sectors){
+    const sp = FEE_SECTOR_PREMIUM[s];
+    if(sp && sp.mult > bestSecMult){ bestSecMult = sp.mult; bestSecLabel = sp.label; }
+  }
+  if(bestSecMult !== 1.0){ fee *= bestSecMult; drivers.push({ k: 'sector', label: bestSecLabel }); }
+
+  // Cross-border premium
+  if(opts.geo === 'international'){ fee *= 1.15; drivers.push({ k: 'geo', label: 'Cross-border +15%' }); }
+
+  // Deal-type adjustment
+  const dt = opts.dealType && FEE_DEALTYPE_ADJ[opts.dealType];
+  if(dt){ fee *= dt.mult; drivers.push({ k: 'dealtype', label: dt.label }); }
+
+  // Variable band — tighter for the mid-market sweet spot, wider for outliers
+  const band = ev_m < 10 ? 0.25 : ev_m <= 100 ? 0.20 : 0.35;
+  let low = fee * (1 - band);
+  let high = fee * (1 + band);
+
+  // Floor — never quote below the firm-type minimum
+  const floor = FEE_TYPE_FLOOR[firmType];
+  if(floor){
+    if(low < floor[0]) low = floor[0];
+    if(high < floor[1]) high = floor[1];
+    if(low > high) low = high * 0.7;
+    if(fee < floor[0]){
+      drivers.push({ k: 'floor', label: `Min engagement floor (${formatFee(floor[0])})` });
+    }
+  }
+
+  return { low, high, mid: (low+high)/2, drivers, band };
 }
 
 function formatFee(amount){
@@ -822,14 +899,14 @@ function formatFee(amount){
   return '£' + Math.round(amount);
 }
 
-function feeRangeStr(ev_m, firmType){
+function feeRangeStr(ev_m, firmType, opts){
   if(!ev_m || ev_m <= 0) return '';
-  const f = estimateFee(ev_m, firmType);
+  const f = estimateFee(ev_m, firmType, opts);
   return formatFee(f.low) + '–' + formatFee(f.high);
 }
 
 function firmFeeRange(firm){
-  // Use midpoint of firm's deal range
+  // Use midpoint of firm's deal range, no scenario context
   const mid = (firm.deal_min + firm.deal_max) / 2;
   return feeRangeStr(mid / 1000000, firm.type);
 }
@@ -841,11 +918,17 @@ function feeColorClass(amount){
   return 'fee-red';
 }
 
-function feeBadgeHTML(ev_m, firmType){
-  if(!ev_m || ev_m <= 0) return '';
-  const f = estimateFee(ev_m, firmType);
-  const cls = feeColorClass((f.low + f.high) / 2);
-  return `<span class="fee-badge ${cls}">${formatFee(f.low)}–${formatFee(f.high)}</span>`;
+// Build the opts object used to flavour the fee estimate from the
+// current matchmaker state. When the user hasn't specified a scenario
+// (e.g. browsing the table), we deliberately pass undefined so the
+// estimate stays neutral (no sector/geo/dealtype premium).
+function feeOptsFromParams(){
+  if(!mmParams) return undefined;
+  const o = {};
+  if((mmParams.sectors||[]).length) o.sectors = mmParams.sectors;
+  if(mmParams.geo && mmParams.geo !== 'any') o.geo = mmParams.geo;
+  if(mmParams.dealType && mmParams.dealType !== 'any') o.dealType = mmParams.dealType;
+  return Object.keys(o).length ? o : undefined;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -935,21 +1018,38 @@ function geoScore(firm, geo){
   return 0.5;
 }
 
+// ── Match scoring
+// Honest neutrals: an axis the user hasn't specified doesn't contribute free
+// credit (the old behaviour collapsed every firm to ~50-75). Instead the
+// total is renormalised over only the axes the user provided, so a firm that
+// nails the two axes you specified gets near 100 and discrimination is sharp.
 function matchBreakdown(firm, params){
   const pMin = (params.ev_min || 0) * 1000000;
   const pMax = (params.ev_max || 0) * 1000000;
-  const ev_mid_m = pMax > 0 ? (pMin + pMax) / 2000000 : 10;
+  const ev_mid_m = pMax > 0 ? (pMin + pMax) / 2000000 : 0;
 
-  const evRaw  = pMax > 0 ? rangeOverlap(pMin, pMax, firm.deal_min || 0, firm.deal_max || 0) : 0.5;
-  const secRaw = computeSectorScore(firm, params.sectors);
-  const tierRaw = tierFitScore(firm.type, ev_mid_m);
-  const geoRaw = geoScore(firm, params.geo);
+  const hasEV      = pMax > 0;
+  const hasSectors = (params.sectors || []).length > 0;
+  const hasGeo     = params.geo && params.geo !== 'any';
 
-  const ev   = { raw: evRaw,   pts: Math.round(evRaw   * 40), max: 40 };
-  const sec  = { raw: secRaw,  pts: Math.round(secRaw  * 35), max: 35 };
-  const tier = { raw: tierRaw, pts: Math.round(tierRaw * 15), max: 15 };
-  const geo  = { raw: geoRaw,  pts: Math.round(geoRaw  * 10), max: 10 };
-  return { ev, sec, tier, geo, total: ev.pts + sec.pts + tier.pts + geo.pts };
+  const evRaw   = hasEV      ? rangeOverlap(pMin, pMax, firm.deal_min || 0, firm.deal_max || 0) : 0;
+  const secRaw  = hasSectors ? computeSectorScore(firm, params.sectors) : 0;
+  const tierRaw = hasEV      ? tierFitScore(firm.type, ev_mid_m) : 0;
+  const geoRaw  = hasGeo     ? geoScore(firm, params.geo) : 0;
+
+  const ev   = { raw: evRaw,   pts: Math.round(evRaw   * 40), max: 40, active: hasEV };
+  const sec  = { raw: secRaw,  pts: Math.round(secRaw  * 35), max: 35, active: hasSectors };
+  const tier = { raw: tierRaw, pts: Math.round(tierRaw * 15), max: 15, active: hasEV };
+  const geo  = { raw: geoRaw,  pts: Math.round(geoRaw  * 10), max: 10, active: hasGeo };
+
+  // Sum only the active-axis weights, then renormalise to /100.
+  const activeWeight = (ev.active?40:0) + (sec.active?35:0) + (tier.active?15:0) + (geo.active?10:0);
+  const achieved     = ev.pts + sec.pts + tier.pts + geo.pts;
+  const total = activeWeight > 0
+    ? Math.round((achieved / activeWeight) * 100)
+    : 0;
+
+  return { ev, sec, tier, geo, total, activeWeight };
 }
 
 function matchScore(firm, params){
@@ -1066,24 +1166,39 @@ function runMatchmaker(){
     return { firm, bd, score: bd.total };
   }).sort((a, b) => b.score - a.score);
 
-  const top = results.filter(r => r.score > 0).slice(0, 50);
+  // Quality cutoff — below 30 the firm is genuinely off-target
+  // and showing it dilutes the signal. Cap at top 25 so the
+  // user sees a shortlist rather than a directory dump.
+  const CUTOFF = 30;
+  const TOP_N  = 25;
+  const top = results.filter(r => r.score >= CUTOFF).slice(0, TOP_N);
   const ev_mid = evMax > 0 ? (evMin + evMax) / 2 : 0;
 
-  document.getElementById('mm-count').textContent =
-    `${top.length} matches of ${universe.length === BD.length ? BD.length : universe.length + ' filtered'}`;
+  // "Sharpen your search" prompt when very few axes are active
+  const activeAxes = (mmParams.ev_max > 0 ? 1 : 0)
+                   + ((mmParams.sectors||[]).length > 0 ? 1 : 0)
+                   + (mmParams.geo && mmParams.geo !== 'any' ? 1 : 0);
+  const sharpenHint = activeAxes <= 1
+    ? `<div class="mm-sharpen">Add a <strong>sector</strong> or <strong>geography</strong> to sharpen the ranking — right now only deal size is being scored.</div>`
+    : '';
+
+  document.getElementById('mm-count').textContent = top.length
+    ? `Top ${top.length} of ${results.filter(r => r.score >= CUTOFF).length} qualifying · ${universe.length} firms scored`
+    : `0 of ${universe.length} firms scored`;
 
   if(!top.length){
-    document.getElementById('mm-list').innerHTML = '<div class="mm-no-results">No matching advisors found. Try widening your parameters or clearing the search.</div>';
+    document.getElementById('mm-list').innerHTML = sharpenHint + '<div class="mm-no-results">No firms cleared the 30-point quality threshold. Widen your EV range, drop the sector filter, or open Browse to see the full database.</div>';
     return;
   }
 
-  document.getElementById('mm-list').innerHTML = top.map((r, i) => {
+  document.getElementById('mm-list').innerHTML = sharpenHint + top.map((r, i) => {
     const b = r.firm;
     const bd = r.bd;
     const scoreCls = r.score >= 80 ? 's-green' : r.score >= 60 ? 's-blue' : r.score >= 40 ? 's-amber' : 's-slate';
     const typeLabelCls = TYPE_LABEL_CLS[b.type] || '';
-    const feeStr = ev_mid > 0 ? feeRangeStr(ev_mid, b.type) : firmFeeRange(b);
-    const feeMid = ev_mid > 0 ? estimateFee(ev_mid, b.type) : estimateFee(((b.deal_min+b.deal_max)/2)/1000000, b.type);
+    const feeOpts = feeOptsFromParams();
+    const feeStr = ev_mid > 0 ? feeRangeStr(ev_mid, b.type, feeOpts) : firmFeeRange(b);
+    const feeMid = ev_mid > 0 ? estimateFee(ev_mid, b.type, feeOpts) : estimateFee(((b.deal_min+b.deal_max)/2)/1000000, b.type);
     const feeCls = feeColorClass((feeMid.low + feeMid.high) / 2);
 
     const conf = dataConfidence(b);
@@ -1093,13 +1208,19 @@ function runMatchmaker(){
       `${esc(b.contact_name)}${b.contact_email ? ` &middot; <a href="mailto:${esc(b.contact_email)}" onclick="event.stopPropagation()">${esc(b.contact_email)}</a>` : ''}` :
       (b.contact_email ? `<a href="mailto:${esc(b.contact_email)}" onclick="event.stopPropagation()">${esc(b.contact_email)}</a>` : '');
 
-    // Score-breakdown bars (4 axes, widths proportional to max weight, fill proportional to score)
+    // Score-breakdown bars — inactive axes (user didn't specify) render
+    // as a hatched track with no fill so it's visible WHY a 100% score
+    // is still 100% even with axes ignored.
+    const barCell = (ax, klass, lbl, max) => ax.active
+      ? `<div class="score-bd-bar ${klass}" title="${lbl} ${ax.pts}/${max}"><span style="width:${(ax.pts/max)*100}%"></span></div>`
+      : `<div class="score-bd-bar ${klass} inactive" title="${lbl}: not specified"></div>`;
+    const lblPart = (ax, name, max) => ax.active ? `${name} ${ax.pts}` : `${name} —`;
     const bdBars = `<div class="score-bd" title="Score breakdown — hover each bar">
-      <div class="score-bd-bar b-ev"   title="EV overlap ${bd.ev.pts}/40"><span style="width:${(bd.ev.pts/40)*100}%"></span></div>
-      <div class="score-bd-bar b-sec"  title="Sector fit ${bd.sec.pts}/35"><span style="width:${(bd.sec.pts/35)*100}%"></span></div>
-      <div class="score-bd-bar b-tier" title="Tier match ${bd.tier.pts}/15"><span style="width:${(bd.tier.pts/15)*100}%"></span></div>
-      <div class="score-bd-bar b-geo"  title="Geography ${bd.geo.pts}/10"><span style="width:${(bd.geo.pts/10)*100}%"></span></div>
-      <span class="score-bd-lbl">EV ${bd.ev.pts} · Sector ${bd.sec.pts} · Tier ${bd.tier.pts} · Geo ${bd.geo.pts}</span>
+      ${barCell(bd.ev,  'b-ev',  'EV overlap',  40)}
+      ${barCell(bd.sec, 'b-sec', 'Sector fit',  35)}
+      ${barCell(bd.tier,'b-tier','Tier match',  15)}
+      ${barCell(bd.geo, 'b-geo', 'Geography',   10)}
+      <span class="score-bd-lbl">${lblPart(bd.ev,'EV',40)} · ${lblPart(bd.sec,'Sector',35)} · ${lblPart(bd.tier,'Tier',15)} · ${lblPart(bd.geo,'Geo',10)}</span>
     </div>`;
 
     const confChecks = conf.checks.map(c =>
@@ -1400,15 +1521,17 @@ function openDP(id){
   if(hasQuery){
     const bd = matchBreakdown(b, mmParams);
     const rationale = matchRationale(b, mmParams, bd);
-    const totalCls = bd.total >= 80 ? '#059669' : bd.total >= 60 ? '#2563EB' : bd.total >= 40 ? '#D97706' : '#64748B';
+    const detailRow = (ax, label, max, color) => ax.active
+      ? `<div class="bd-row"><span class="bd-row-label">${label}</span><div class="bd-row-bar"><span style="width:${(ax.pts/max)*100}%;background:${color}"></span></div><span class="bd-row-pts">${ax.pts}/${max}</span></div>`
+      : `<div class="bd-row bd-row-inactive"><span class="bd-row-label">${label}</span><div class="bd-row-bar bd-row-bar-inactive"></div><span class="bd-row-pts">—</span></div>`;
     bdBlockHtml = `
       <div class="sec">
         <div class="sec-title">Why this match · ${bd.total}/100</div>
         <div class="bd-detail">
-          <div class="bd-row"><span class="bd-row-label">EV overlap</span><div class="bd-row-bar"><span style="width:${(bd.ev.pts/40)*100}%;background:#0E7A6E"></span></div><span class="bd-row-pts">${bd.ev.pts}/40</span></div>
-          <div class="bd-row"><span class="bd-row-label">Sector fit</span><div class="bd-row-bar"><span style="width:${(bd.sec.pts/35)*100}%;background:var(--purple-brand)"></span></div><span class="bd-row-pts">${bd.sec.pts}/35</span></div>
-          <div class="bd-row"><span class="bd-row-label">Tier match</span><div class="bd-row-bar"><span style="width:${(bd.tier.pts/15)*100}%;background:#7B3FA0"></span></div><span class="bd-row-pts">${bd.tier.pts}/15</span></div>
-          <div class="bd-row"><span class="bd-row-label">Geography</span><div class="bd-row-bar"><span style="width:${(bd.geo.pts/10)*100}%;background:#D97706"></span></div><span class="bd-row-pts">${bd.geo.pts}/10</span></div>
+          ${detailRow(bd.ev,   'EV overlap', 40, '#047857')}
+          ${detailRow(bd.sec,  'Sector fit', 35, 'var(--purple-brand)')}
+          ${detailRow(bd.tier, 'Tier match', 15, '#6D28D9')}
+          ${detailRow(bd.geo,  'Geography',  10, '#B45309')}
           ${rationale ? `<div class="bd-rationale">${esc(rationale)}</div>` : ''}
         </div>
       </div>`;
@@ -1508,13 +1631,14 @@ function openDP(id){
         <div class="sec-title">Fee Estimator</div>
         <div class="fee-calc">
           <div class="fee-calc-row">
-            <span style="font-size:12px;color:var(--text-mid)">Enter deal EV:</span>
-            <span style="font-size:13px;color:var(--text-mid)">&#xa3;</span>
+            <span style="font-size:12px;color:var(--ink-mid);font-weight:500">Enter deal EV:</span>
+            <span style="font-size:13px;color:var(--ink-mid);font-weight:500">&#xa3;</span>
             <input type="number" class="fee-calc-input" id="fc-input" placeholder="25" min="0" step="1" oninput="calcFee('${b.id}')">
-            <span style="font-size:12px;color:var(--slate)">m</span>
-            <span style="font-size:12px;color:var(--text-mid)">&#x2192;</span>
+            <span style="font-size:12px;color:var(--ink-light);font-weight:500">m</span>
+            <span style="font-size:12px;color:var(--ink-mid);font-weight:500">&#x2192;</span>
             <span class="fee-calc-result" id="fc-result">—</span>
           </div>
+          <div class="fee-calc-drivers" id="fc-drivers"></div>
         </div>
       </div>
 
@@ -1589,8 +1713,30 @@ function calcFee(id){
   if(!b)return;
   const val=parseFloat(document.getElementById('fc-input')?.value);
   const el=document.getElementById('fc-result');
-  if(!val||val<=0){el.textContent='—';return;}
-  el.textContent=feeRangeStr(val,b.type);
+  const drEl=document.getElementById('fc-drivers');
+  if(!val||val<=0){
+    el.textContent='—';
+    if(drEl) drEl.innerHTML='';
+    return;
+  }
+  const feeOpts=feeOptsFromParams();
+  const f=estimateFee(val,b.type,feeOpts);
+  el.textContent=formatFee(f.low)+'–'+formatFee(f.high);
+  if(drEl){
+    const baseLehman = (() => {
+      const ev=val*1e6;
+      if(ev<=10e6) return ev*0.05;
+      if(ev<=25e6) return 5e5+(ev-10e6)*0.04;
+      if(ev<=50e6) return 11e5+(ev-25e6)*0.03;
+      if(ev<=100e6) return 1.85e6+(ev-50e6)*0.02;
+      return 2.85e6+(ev-100e6)*0.01;
+    })();
+    const bandPct=Math.round(f.band*100);
+    drEl.innerHTML = `
+      <div class="fc-drivers-base">Lehman base ${formatFee(baseLehman)} · band &plusmn;${bandPct}%</div>
+      ${f.drivers.length ? `<ul class="fc-drivers-list">${f.drivers.map(d=>`<li>${esc(d.label)}</li>`).join('')}</ul>` : ''}
+    `;
+  }
 }
 
 function closeDP(e){

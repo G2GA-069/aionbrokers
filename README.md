@@ -1,57 +1,58 @@
-# AION Broker Intelligence
+# G2G Advisory · Broker Intelligence
 
-Internal deal sourcing platform for **AION Succession Partners** — 375 UK M&A advisors and business brokers, searchable and filterable, built to drive systematic outreach for B2B vertical software acquisition mandates.
+Universal M&A advisor matchmaker for G2G Advisory — 400+ UK corporate-finance advisors and business brokers, scored and ranked against any deal in real time, with the data signal behind every recommendation.
 
-## Quick Start
+**Live:** https://g2g-broker-intel.whatimade.app
 
-**Locally:** Open `index.html` in any browser. Password: **AION2025**
+## What it does
 
-**GitHub Pages (live URL):**
-1. Create a new **private** GitHub repo (e.g. `aion-broker-intel`)
-2. Push this folder:
+Two modes, one dataset.
+
+**Matchmaker.** Enter a deal — Enterprise Value, sector, geography, deal type — and the engine ranks the 400+ firms instantly. Each card shows the match score (0-100), a colour-coded breakdown across the four scoring axes (EV overlap /40, sector fit /35, tier match /15, geography /10), a one-line plain-English rationale, and a data-confidence badge (Verified / Researched / Auto-listed) so you know how much of the underlying record is independently corroborated.
+
+**Browse.** The full database, filterable by firm type, pipeline status, SaaS-focus score, email presence and FCA registration. CRM state (status, notes) persists in `localStorage`.
+
+## Architecture
+
+Single self-contained `index.html` plus the icon set. No build step, no dependencies beyond Google Fonts (Playfair Display + Inter + JetBrains Mono). Deployable to GitHub Pages, Netlify, S3, or any static host.
+
+## Local use
+
 ```bash
-git init && git add . && git commit -m "AION Broker Intel v6"
-git remote add origin https://github.com/USERNAME/aion-broker-intel.git
-git push -u origin main
+git clone https://github.com/G2GA-069/aionbrokers.git
+cd aionbrokers
+# Open index.html in a browser
 ```
-3. Settings → Pages → Source: `main` branch, `/ (root)` → Save
-4. Live in ~60 seconds at `https://USERNAME.github.io/aion-broker-intel/`
 
-> **Note on OG preview image:** For WhatsApp to show the preview card, update the `og:image` meta tag in `index.html` to use the full absolute URL once you know your GitHub Pages domain:
-> ```html
-> <meta property="og:image" content="https://USERNAME.github.io/aion-broker-intel/og-image.png">
-> ```
-
-## Changing the Password
+## Changing the password
 
 ```bash
-# Generate SHA-256 hash for your new password
 echo -n "YourNewPassword" | sha256sum
 ```
-Find `const PW_HASH = '...'` near the bottom of `index.html` and replace the hash.
 
-## Folder Structure
+Replace `PW_HASH` in `index.html` with the SHA-256 hex digest.
+
+## Scoring engine
 
 ```
-aion-broker-intel/
-├── index.html        ← entire app, self-contained (~527KB)
-├── icon.png          ← 512×512 favicon / bookmark icon / Apple touch icon
-├── favicon-32.png    ← 32×32 browser tab favicon
-├── icon.svg          ← SVG source for the icon
-├── og-image.png      ← 1200×630 WhatsApp / social share preview image
-├── .gitignore
-└── README.md
+total = EV-overlap (0-40) + sector-fit (0-35) + tier-match (0-15) + geography (0-10)
 ```
 
-## What's Inside
+- **EV overlap** rewards firms whose stated deal range *contains* the query. A firm covering £20m-£750m gets full credit for a £200m deal.
+- **Sector fit** scans the firm's `sector`, `notes`, `saas_kw` and `name` fields against curated keyword sets per sector. Technology uses the firm's SaaS score directly.
+- **Tier match** maps firm type (bulge / elite / upper-MM / tech specialist / CF boutique / accountancy / broker) to deal size with empirically-tuned weights.
+- **Geography** prefers London / national / international networks per query.
 
-- **375 firms** — iTABB, Axial, curated research, enriched via Companies House
-- **B2B SaaS scoring** (0–100) surfaces tech-specialist advisors
-- **EV range filters** — Sub-£2m / £2m–£10m / £10m–£50m / Over £50m
-- **305 contact emails** with confidence badges
-- **AI outreach drafting** — personalised cold emails as Wernher Pikali
-- **CRM tracking** — pipeline status persisted in localStorage
-- **People intelligence** — CH directors + scraped team pages merged
+Firms below a 30-point threshold are hidden. Top results show one-line rationales like *"Signals strong energy/oil & gas coverage · deal range £100m-£5bn+ brackets your size."*
+
+## Fee estimator
+
+Lehman-style sliding scale (5% / 4% / 3% / 2% / 1% across £10m / £15m / £25m / £50m / £100m brackets) with type multiplier (bulge ×1.8 down to broker ×0.5), sector premium (tech / energy / cross-border each +10-15%), and per-type minimum floor. Displayed as a low-high band on every card and in the detail-panel live calculator.
+
+## Data confidence
+
+Each firm is scored on six signals: lead contact verification, team-page scrape, confirmed-email count, analyst notes length, Companies House record, team-size on file. Surfaced as a 3-level badge with a hover popover showing the underlying checks.
 
 ---
-*Built by G2G Advisory · Private & Confidential*
+
+Built for G2G Advisory · London corporate finance & M&A.
