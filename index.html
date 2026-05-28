@@ -446,23 +446,38 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
   .sb-hamburger{display:flex}
   .sidebar{position:fixed;left:-220px;top:52px;bottom:0;z-index:40;transition:left .25s}
   .sidebar.open{left:0}
-  .mm-hero{padding:32px 16px 24px}
-  .mm-title{font-size:26px}
+  .nav{padding:0 12px;gap:10px}
+  .nav-logo{font-size:15px;gap:6px}
+  .nav-logo-sub{display:none}
+  .nav-div{margin:0 2px}
+  .mode-btn{padding:5px 11px;font-size:11.5px}
+  .mm-hero{padding:34px 18px 28px}
+  .mm-eyebrow{font-size:9.5px;letter-spacing:.15em;margin-bottom:14px;gap:10px}
+  .mm-eyebrow::before,.mm-eyebrow::after{width:18px}
+  .mm-title{font-size:30px;letter-spacing:-.005em}
+  .mm-subtitle{font-size:13px;line-height:1.55}
   .mm-config{padding:20px 16px}
   .mm-ev-row{flex-wrap:wrap}
   .mm-ev-input{width:110px}
   .mm-card{flex-direction:column;gap:10px;padding:14px 16px}
+  .mm-card-top{flex-wrap:wrap}
   .mm-score{width:auto;height:auto;flex-direction:row;gap:6px;padding:4px 12px;border-radius:16px}
   .mm-score-num{font-size:16px}
   .tbl-area{padding:8px}
   .c-sector,.c-contact{display:none}
   .dp{width:100vw}
+  /* Confidence popover on mobile: anchor centred so it stays in viewport */
+  .conf-pop{right:auto;left:50%;transform:translateX(-50%);width:min(260px,calc(100vw - 32px))}
 }
 @media(max-width:480px){
   .nav-search{display:none}
   .mode-btn{padding:5px 10px;font-size:11px}
   .mm-pills{gap:5px}
   .mm-pill{font-size:11px;padding:5px 10px}
+  .mm-title{font-size:26px}
+  .mm-eyebrow{font-size:9px}
+  .mm-subtitle{font-size:12.5px}
+  .score-legend{font-size:9.5px;padding:8px 10px;gap:5px 10px}
 }
 </style>
 </head>
