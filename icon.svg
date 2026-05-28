@@ -1,49 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0A2744"/>
-      <stop offset="100%" style="stop-color:#0D3258"/>
-    </linearGradient>
-    <!-- Subtle inner glow at bottom left -->
-    <radialGradient id="glow" cx="25%" cy="80%" r="60%">
-      <stop offset="0%" style="stop-color:#1A4A80;stop-opacity:0.6"/>
-      <stop offset="100%" style="stop-color:#0A2744;stop-opacity:0"/>
+    <radialGradient id="hi" cx="28%" cy="22%" r="55%">
+      <stop offset="0%" stop-color="#E8D693" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#E8D693" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="lo" cx="78%" cy="88%" r="60%">
+      <stop offset="0%" stop-color="#5B2C9E" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#5B2C9E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2A0B5C"/>
+      <stop offset="45%" stop-color="#3A1078"/>
+      <stop offset="100%" stop-color="#4A1690"/>
+    </linearGradient>
   </defs>
-
-  <!-- Background rounded square -->
-  <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="100" ry="100" fill="url(#glow)"/>
-
-  <!-- Arc — large, elegant, upper-right quadrant only — references AION's circular logo element -->
-  <!-- Outer arc -->
-  <path d="M 80 430 A 270 270 0 0 1 256 52"
-        fill="none" stroke="rgba(200,230,245,0.18)" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- Inner arc, subtler -->
-  <path d="M 108 430 A 220 220 0 0 1 256 88"
-        fill="none" stroke="rgba(200,230,245,0.08)" stroke-width="1.5" stroke-linecap="round"/>
-
-  <!-- "AION" text — clean, slightly condensed serif feel via letterSpacing -->
-  <text
-    x="256" y="310"
-    text-anchor="middle"
-    font-family="Georgia, 'Times New Roman', serif"
-    font-size="164"
-    font-weight="400"
-    letter-spacing="8"
-    fill="#FFFFFF">AION</text>
-
-  <!-- "SP" micro label below — gives it a badge quality -->
-  <text
-    x="256" y="370"
-    text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="26"
-    font-weight="600"
-    letter-spacing="14"
-    fill="rgba(200,230,245,0.38)">SUCCESSION</text>
-
-  <!-- Thin bottom accent line -->
-  <line x1="156" y1="406" x2="356" y2="406"
-        stroke="rgba(200,230,245,0.18)" stroke-width="1.5" stroke-linecap="round"/>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#hi)"/>
+  <rect width="512" height="512" fill="url(#lo)"/>
+  <text x="50%" y="50%"
+        text-anchor="middle" dominant-baseline="central"
+        font-family="'Playfair Display', Georgia, 'Times New Roman', serif"
+        font-size="300" font-weight="500"
+        letter-spacing="-12"
+        fill="#FFFFFF">
+    <tspan>G</tspan><tspan font-style="italic" font-weight="400" fill="#E8D693">2</tspan><tspan>G</tspan>
+  </text>
+  <rect x="194" y="468" width="124" height="10" rx="5" fill="#C9A84C"/>
 </svg>
